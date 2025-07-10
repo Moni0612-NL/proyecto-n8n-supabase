@@ -1,0 +1,814 @@
+{
+  "name": "Notificaciones facturas vencidas",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -120,
+        40
+      ],
+      "id": "9fc7eb89-2ea7-41ec-8c07-feb12b537bb3",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "Facturas",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "estado",
+              "condition": "neq",
+              "keyValue": "pagada"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        100,
+        -100
+      ],
+      "id": "1238d177-076a-46a3-a2a6-0427677f884c",
+      "name": "Get many rows",
+      "credentials": {
+        "supabaseApi": {
+          "id": "PHfw82nof0TvilBP",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const hoy = new Date();\nconst sieteDias = 7 * 24 * 60 * 60 * 1000; // 7 días en milisegundos\nconst resultado = [];\n\nfor (const item of items) {\n  const vencimiento = new Date(item.json.fecha_vencimiento);\n  const diff = vencimiento - hoy;\n\n  // Solo si la factura vence en los próximos 7 días\n  if (diff >= 0 && diff <= sieteDias) {\n    item.json.estado_notif = \"por vencer\";\n    resultado.push(item);\n  }\n}\n\nreturn resultado;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        340,
+        -120
+      ],
+      "id": "7e9b0a46-6c41-435f-b3f2-6796ec67255c",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "Clientes",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{$json[\"cliente_id\"]}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        500,
+        40
+      ],
+      "id": "da62cb93-cf22-4b71-8bc5-3d41d9e0e6f6",
+      "name": "Get many rows1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "PHfw82nof0TvilBP",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "cliente_id",
+              "field2": "id"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        300,
+        260
+      ],
+      "id": "862f6675-8349-4cff-a30f-d6da31585469",
+      "name": "Merge",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "sendTo": "={{$json[\"correo\"]}}",
+        "subject": "=Notificación de factura {{ $json[\"estado_notif\"] }}",
+        "message": "=Hola {{$json[\"nombre\"]}},  Te notificamos que tu factura con vencimiento el {{$json[\"fecha_vencimiento\"]}} está {{$json[\"estado_notif\"]}}.  Por favor realiza el pago a la mayor brevedad posible.  Gracias, Equipo de Cartera.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        520,
+        260
+      ],
+      "id": "10a569a3-0a6a-4b70-8573-0446a9be721a",
+      "name": "Send a message",
+      "webhookId": "a3811138-ab47-434d-aea0-f7e6e5901909",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UksjzPtfvY0WCgc3",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "Historial_de_cobranzas",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "cliente_id",
+              "fieldValue": "=f6d07927-f2a1-4184-9910-a171ba863389"
+            },
+            {
+              "fieldId": "factura_id",
+              "fieldValue": "=82b75eeb-ca63-4f9f-9b1d-fb3cf309d24b"
+            },
+            {
+              "fieldId": "tipo_accion",
+              "fieldValue": "correo"
+            },
+            {
+              "fieldId": "observacion",
+              "fieldValue": "Se notificó vía correo."
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        740,
+        260
+      ],
+      "id": "ef83afc5-00cd-4693-ad9b-174d2e4f3ccc",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "PHfw82nof0TvilBP",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agente-cliente",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -340,
+        520
+      ],
+      "id": "73b6ca50-a491-4533-980d-18c110eecf56",
+      "name": "Webhook",
+      "webhookId": "e1e40c11-d9f6-4c76-9003-96a66ae552fc"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const body = $json.body || $json;\nconst mensaje = body[\"mensaje\"]?.toLowerCase() || \"\";\nconst correo = body[\"correo\"] || \"\";\n\nlet tipo = \"desconocido\";\n\n// Detectar palabra clave en el mensaje\nif (mensaje.includes(\"saldo\") || mensaje.includes(\"pendiente\") || mensaje.includes(\"slado\")) {\n  tipo = \"saldo\";\n} else if (mensaje.includes(\"factura\") || mensaje.includes(\"vencida\") || mensaje.includes(\"cuenta\")) {\n  tipo = \"factura\";\n} else if (mensaje.includes(\"pago\") || mensaje.includes(\"pagado\") || mensaje.includes(\"transferencia\")) {\n  tipo = \"pago\";\n}\n\nreturn {\n  tipo,\n  correo\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        520
+      ],
+      "id": "cfaa7816-ef05-43e5-b0cc-e68e4e223f7b",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7baa6390-02e8-45ba-948a-ac3479a4f8b0",
+              "leftValue": "={{ $json[\"tipo\"] }}",
+              "rightValue": "saldo",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "b60e2d3c-1b62-4f3c-8f7d-e156e422082e",
+              "leftValue": "={{ $json[\"tipo\"] }}",
+              "rightValue": "factura",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "8fb10fe9-251b-4689-8dfa-b326a4dbc419",
+              "leftValue": "={{ $json[\"tipo\"] }}",
+              "rightValue": "pago",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -280,
+        760
+      ],
+      "id": "5440e217-1709-47d9-8d42-10d097ac15be",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"respuesta\": \"Hola, tu saldo pendiente es de ${{ $json.saldo_total }}. Has pagado un total de ${{ $json.total_pagado }}. Observaciones: {{ $json.observaciones }}. El estado de tu cuenta es: {{ $json.estado }}.\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1020,
+        420
+      ],
+      "id": "7a7be797-30c4-4884-bebf-40ac1a32447a",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"respuesta\": \"Lo siento, no entendí tu pregunta. Por favor pregunta por tu saldo, facturas, pagos u otra información de cartera.\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        140,
+        780
+      ],
+      "id": "30cb3f5e-1ad3-43e2-908e-1c9c5bce89d6",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "Estados_de_cuenta",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "cliente_id",
+              "condition": "eq",
+              "keyValue": "={{$json[\"id\"]}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        700,
+        420
+      ],
+      "id": "fb5aa29e-9b78-4039-87b4-1feace2d18df",
+      "name": "Get many rows3",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "PHfw82nof0TvilBP",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "Clientes",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "correo",
+              "condition": "eq",
+              "keyValue": "={{$json[\"correo\"]}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        440,
+        420
+      ],
+      "id": "28444cee-3f75-4fb2-a51b-b37efb466fca",
+      "name": "Get many rows2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "PHfw82nof0TvilBP",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json[\"tipo\"]}}",
+                    "rightValue": "saldo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "ceaa8d2b-1626-4153-b180-f4a0721c13d6"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "63518523-1ad6-46ab-a560-a5b4ddd3fa38",
+                    "leftValue": "={{$json[\"tipo\"]}}",
+                    "rightValue": "factura",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "2c8bf4e0-0508-4585-a235-2c1cc9968411",
+                    "leftValue": "={{$json[\"tipo\"]}}",
+                    "rightValue": "pago",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        120,
+        500
+      ],
+      "id": "e8b6f8d5-4752-432c-a5a8-fdd0e526a781",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "Clientes",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "correo",
+              "condition": "eq",
+              "keyValue": "={{$json[\"correo\"]}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        440,
+        560
+      ],
+      "id": "59044259-9dcd-4c69-bbdd-950c96e7f112",
+      "name": "Get many rows4",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "PHfw82nof0TvilBP",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "Clientes",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "correo",
+              "condition": "eq",
+              "keyValue": "={{$json[\"correo\"]}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        440,
+        720
+      ],
+      "id": "a9dc0a56-7724-48d8-ac3a-942eea00c72d",
+      "name": "Get many rows5",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "PHfw82nof0TvilBP",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "Facturas",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "cliente_id",
+              "condition": "eq",
+              "keyValue": "={{$json[\"id\"]}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        700,
+        560
+      ],
+      "id": "0e2e010f-69cd-4bb0-bbce-5ef6db68fc5d",
+      "name": "Get many rows6",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "PHfw82nof0TvilBP",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "Pagos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "cliente_id",
+              "condition": "eq",
+              "keyValue": "={{$json[\"id\"]}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        700,
+        720
+      ],
+      "id": "d7bba106-f217-45d9-9d30-e38f8f0a0746",
+      "name": "Get many rows7",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "PHfw82nof0TvilBP",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"respuesta\": \"Hola, estas son tus facturas pendientes. Total: ${{ $json.total }}. Fecha de emisión: {{ $json.fecha_emision }}. Fecha de vencimiento: {{ $json.fecha_vencimiento }}. Estado: {{ $json.estado }}. Saldo pendiente: ${{ $json.saldo_pendiente }}.\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1020,
+        560
+      ],
+      "id": "885be9f5-e59d-473e-b33e-699dc263b5a1",
+      "name": "Respond to Webhook2"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"respuesta\": \"Hola, estos son tus pagos registrados. Fecha de pago: {{ $json.fecha_pago }}. Monto: ${{ $json.monto }}.\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1020,
+        720
+      ],
+      "id": "9473d2bd-8e4e-426c-86c0-fc1819cfd600",
+      "name": "Respond to Webhook3"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Get many rows1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [],
+        []
+      ]
+    },
+    "Get many rows3": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows2": {
+      "main": [
+        [
+          {
+            "node": "Get many rows3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Get many rows2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many rows4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many rows5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows4": {
+      "main": [
+        [
+          {
+            "node": "Get many rows6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows5": {
+      "main": [
+        [
+          {
+            "node": "Get many rows7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows6": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows7": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2d0bf995-c695-46b2-a6a6-ec308a6da4bd",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3c4be9bb67e21283506ec51b8a972225e89b237fd1090ad41ca64f22dcf663b3"
+  },
+  "id": "e51JsBLsUeRnzfxK",
+  "tags": []
+}
